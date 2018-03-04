@@ -1,0 +1,3 @@
+package: github.com/RyanJarv/docker-snitch
+import:
+- package: github.com/AkihiroSuda/go-netfilter-queue
