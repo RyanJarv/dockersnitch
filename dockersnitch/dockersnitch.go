@@ -19,29 +19,28 @@ func Run() {
 	defer nfq.Close()
 	packets := nfq.GetPackets()
 
-
-	for true {
-		select {
-		case p := <-packets:
-			HandlePacket(p)
-		}
+	for p := range packets:
+		HandlePacket(p)
 	}
 }
 
 func HandlePacket(p netfilter.NFPacket) {
 	dst := p.Packet.(gopacket.Packet).TransportLayer().TransportFlow().Dst().Raw()
-	connList := NewConnectionList()
-	select connList.Check(dst) {
-	case: Whitelisted
+	connList := map[[]byte]*Connection
+	switch v := connList[dst]; v.Status() {
+	case Whitelisted:
 		fmt.Println("Whitelisted: %s", p.Packet)
 		p.SetVerdict(netfilter.NF_ACCEPT)
-	case: Blaclisted
+	case Blaclisted:
 		fmt.Println("Blacklisted: %s", p.Packet)
 		p.SetVerdict(netfilter.NF_DROP)
-	case: Unknown
+	case InProgress:
+		fmt.Println("InProgress: %s", p.Packet)
+		v.Queue(p)
+	default:
 		fmt.Println("Unknown: %s", p.Packet)
-		dockersnitch.Connection.Create(p)
-		//p.SetVerdict(netfilter.NF_ACCEPT)
+		c := Connection.Create(p)
+		connList[dst] = c
 	}
 }
 
