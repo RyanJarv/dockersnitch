@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/RyanJarv/docker-snitch/dockersnitch"
+	"github.com/RyanJarv/dockersnitch/dockersnitch"
 )
 
 func main() {
