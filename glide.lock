@@ -1,10 +1,13 @@
-hash: be56e8402074967df6839f7788a7f66a82a3836e4256d452b9ad60628b8c3f9b
-updated: 2018-03-04T01:06:48.209786613-06:00
+hash: 2101cd1fdaa0b4973c6deac9315ba49820847617f173b641399243a7bcb47958
+updated: 2018-03-05T22:32:32.775983195-06:00
 imports:
 - name: github.com/AkihiroSuda/go-netfilter-queue
   version: ca2804491d55fc5bbf8f82e938d726b763590525
-- name: github.com/google/gopacket
-  version: b40365fca6ccb41d3892c4caa0f6e7545ee2fdcf
+- name: github.com/coreos/go-iptables
+  version: b5b1876b170881a8259f036445ee89c8669db386
+- name: github.com/iovisor/gobpf
+  version: 81c26b7026fa174bd0ac0e26f3c29ba66fd9b2c0
   subpackages:
-  - layers
+  - bcc
+  - pkg/cpuonline
 testImports: []

@@ -1,3 +1,9 @@
 package: github.com/RyanJarv/docker-snitch
 import:
 - package: github.com/AkihiroSuda/go-netfilter-queue
+  version: ca2804491d55fc5bbf8f82e938d726b763590525
+- package: github.com/coreos/go-iptables
+  version: ^0.3.0
+- package: github.com/iovisor/gobpf
+  subpackages:
+  - bcc
