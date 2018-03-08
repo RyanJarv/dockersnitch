@@ -12,7 +12,6 @@ func main() {
 	i := dockersnitch.NewIntercepter()
 
 	go i.RunMainQueue()
-	go i.RunDropQueue()
 
 	WaitForCtrlC()
 }

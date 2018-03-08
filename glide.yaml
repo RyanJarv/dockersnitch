@@ -7,3 +7,5 @@ import:
 - package: github.com/iovisor/gobpf
   subpackages:
   - bcc
+- package: github.com/google/gopacket
+  version: ^1.1.14

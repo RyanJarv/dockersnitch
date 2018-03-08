@@ -38,7 +38,7 @@ type Connection struct {
 
 func (c *Connection) Prompt(p *netfilter.NFPacket) ConnectionStatus {
 	c.Status = Prompting
-	dst := (*p).Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String()
+	dst := p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String()
 	log.Printf("Prompting on dst %s", dst)
 	r := bufio.NewReader(os.Stdin)
 	fmt.Printf("New connection to %s found, is this expected? [yes/no] ", dst)
@@ -50,14 +50,13 @@ func (c *Connection) Prompt(p *netfilter.NFPacket) ConnectionStatus {
 		c.Whitelist(p)
 		return Whitelisted
 	} else {
-		c.Whitelist(p)
-		//c.Blacklist(p)
+		c.Blacklist(p)
 		return Blacklisted
 	}
 }
 
 func (c *Connection) Whitelist(p *netfilter.NFPacket) {
-	log.Printf("Setting whitelist for dst %s", (*p).Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
+	log.Printf("Setting whitelist for dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
 	(*p).SetVerdict(netfilter.NF_ACCEPT)
 	select {
 	case p := <-c.Queue:
@@ -69,11 +68,11 @@ func (c *Connection) Whitelist(p *netfilter.NFPacket) {
 }
 
 func (c *Connection) Blacklist(p *netfilter.NFPacket) {
-	log.Printf("Setting blacklist for dst %s", (*p).Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
-	(*p).SetRequeueVerdict(1)
+	log.Printf("Setting blacklist for dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
+	(*p).SetVerdict(netfilter.NF_DROP)
 	select {
 	case p := <-c.Queue:
-		(*p).SetRequeueVerdict(1)
+		(*p).SetVerdict(netfilter.NF_DROP)
 	default:
 	}
 	c.Status = Blacklisted //Do this last to prevent any out of order packets
@@ -81,7 +80,7 @@ func (c *Connection) Blacklist(p *netfilter.NFPacket) {
 }
 
 func (c *Connection) QueueNFPacket(p *netfilter.NFPacket) error {
-	log.Printf("Queueing packet with dst %s", (*p).Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
+	log.Printf("Queueing packet with dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
 	select {
 	case c.Queue <- p:
 		return nil

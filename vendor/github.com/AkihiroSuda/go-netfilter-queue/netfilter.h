@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/socket.h>

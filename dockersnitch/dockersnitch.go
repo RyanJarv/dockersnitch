@@ -37,29 +37,6 @@ func (i *Intercepter) RunMainQueue() {
 	}
 }
 
-//RunDropQueue ...
-//We just accept all the packets here because the next rule in the iptables chain has a REJECT target
-func (i *Intercepter) RunDropQueue() {
-	log.Printf("Running drop queue")
-	var err error
-
-	nfq, err := netfilter.NewNFQueue(1, 100, netfilter.NF_DEFAULT_PACKET_SIZE)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer nfq.Close()
-	packets := nfq.GetPackets()
-
-	for true {
-		select {
-		case p := <-packets:
-			log.Print("Accepting from drop queue")
-			p.SetVerdict(netfilter.NF_DROP)
-		}
-	}
-}
-
 func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	dst := (*p).Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String()
 
@@ -72,10 +49,10 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	switch c.Status {
 	case Whitelisted:
 		log.Printf("Whitelisted dst: %s", dst)
-		(*p).SetVerdict(netfilter.NF_ACCEPT)
+		p.SetVerdict(netfilter.NF_ACCEPT)
 	case Blacklisted:
 		log.Printf("Blacklisted dst: %s", dst)
-		(*p).SetRequeueVerdict(1)
+		p.SetVerdict(netfilter.NF_DROP)
 	case Prompting:
 		c.QueueNFPacket(p)
 	case Unitialized:
