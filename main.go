@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	dockersnitch.SetupIPTables()
 	i := dockersnitch.NewIntercepter()
 
 	go i.RunMainQueue()
@@ -27,4 +28,5 @@ func WaitForCtrlC() {
 		end_waiter.Done()
 	}()
 	end_waiter.Wait()
+	dockersnitch.TeardownIPTables()
 }
