@@ -68,7 +68,7 @@ func main() {
 	whitelist.Refresh([]string{})
 
 	dockersnitch.SetupIPTables()
-	i := dockersnitch.NewIntercepter(blacklist, whitelist)
+	i := dockersnitch.NewIntercepter("/var/run/dockersnitch.sock", blacklist, whitelist)
 
 	go i.RunMainQueue()
 
@@ -87,4 +87,5 @@ func WaitForCtrlC() {
 	}()
 	end_waiter.Wait()
 	dockersnitch.TeardownIPTables()
+	os.Remove("/var/run/dockersnitch.sock")
 }

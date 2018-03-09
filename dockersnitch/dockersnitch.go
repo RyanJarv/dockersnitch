@@ -3,6 +3,7 @@ package dockersnitch
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
@@ -12,15 +13,18 @@ import (
 
 const NFQueueNum = 3413
 
-func NewIntercepter(bl, wl *ipset.IPSet) *Intercepter {
-	return &Intercepter{
+func NewIntercepter(p string, bl *ipset.IPSet, wl *ipset.IPSet) *Intercepter {
+	i := &Intercepter{
 		connList:  map[string]*Connection{},
 		blacklist: bl,
 		whitelist: wl,
 	}
+	i.ListenSocket(p)
+	return i
 }
 
 type Intercepter struct {
+	stream    net.Conn
 	connList  map[string]*Connection
 	blacklist *ipset.IPSet
 	whitelist *ipset.IPSet
@@ -61,7 +65,7 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	case Unitialized:
 		log.Printf("Prompting for connection with dst: %s", dst)
 		c.QueuePacket(p)
-		if c.Prompt() == Whitelisted {
+		if c.Prompt(i.stream) == Whitelisted {
 			log.Printf("Whitelisting connection with dst %s", dst)
 			i.whitelist.Add(dst, 0)
 		} else {
@@ -72,4 +76,29 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	default:
 		log.Print("This shouldn't happen: %v", (*p))
 	}
+}
+
+func (i *Intercepter) ListenSocket(path string) {
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		log.Fatal("listen error:", err)
+	}
+
+	go func() {
+		defer l.Close()
+		for {
+			s, err := l.Accept()
+			if err != nil {
+				log.Fatal("accept error:", err)
+			}
+			if i.stream == nil {
+				i.stream = s
+			} else if _, err := i.stream.Read([]byte{}); err != nil {
+				i.stream = s
+			} else {
+				s.Write([]byte("Connection already open"))
+				s.Close()
+			}
+		}
+	}()
 }

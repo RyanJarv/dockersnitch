@@ -28,11 +28,6 @@ func SetupIPTables() {
 		log.Fatal(err)
 	}
 
-	//if err := ipt.Append("filter", IPTChain, "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"); err != nil {
-	//	log.Printf("iptables: Could not set up ACCEPT rule on chain $s", IPTChain)
-	//	log.Fatal(err)
-	//}
-
 	if err := ipt.Append("filter", IPTChain, "-j", "LOG"); err != nil {
 		log.Printf("iptables: Could not set up Reject rule on chain $s", IPTChain)
 		log.Fatal(err)
