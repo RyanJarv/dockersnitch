@@ -5,26 +5,30 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	//"os/signal"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
 	"github.com/google/gopacket"
 	"github.com/janeczku/go-ipset/ipset"
 )
 
-const NFQueueNum = 3413
-
-func NewIntercepter(p string, bl *ipset.IPSet, wl *ipset.IPSet) *Intercepter {
+func NewIntercepter(p string, nfqueue uint16, bl *ipset.IPSet, wl *ipset.IPSet) *Intercepter {
 	i := &Intercepter{
+		socket:    p,
 		connList:  map[string]*Connection{},
+		nfQueue:   nfqueue,
 		blacklist: bl,
 		whitelist: wl,
 	}
-	i.ListenSocket(p)
+	i.ListenSocket()
 	return i
 }
 
 type Intercepter struct {
+	socket    string
 	stream    net.Conn
+	nfQueue   uint16
 	connList  map[string]*Connection
 	blacklist *ipset.IPSet
 	whitelist *ipset.IPSet
@@ -32,18 +36,31 @@ type Intercepter struct {
 
 func (i *Intercepter) RunMainQueue() {
 	log.Printf("Running main queue")
-	var err error
-
-	nfq, err := netfilter.NewNFQueue(NFQueueNum, 100, netfilter.NF_DEFAULT_PACKET_SIZE)
+	nfq, err := netfilter.NewNFQueue(i.nfQueue, 100, netfilter.NF_DEFAULT_PACKET_SIZE)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 	defer nfq.Close()
+
+	signal_channel := make(chan os.Signal)
+	signal.Notify(signal_channel, os.Interrupt)
 	packets := nfq.GetPackets()
-	for p := range packets {
-		go i.handlePacket(&p)
+	for {
+		select {
+		case p := <-packets:
+			go i.handlePacket(&p)
+		case <-signal_channel:
+			log.Printf("Cleaning up Dockersnitch.Intercepter")
+			i.Teardown()
+			log.Printf("Done tearing down Dockersnitch.Intercepter")
+			return
+		}
 	}
+}
+
+func (i *Intercepter) Teardown() {
+	os.Remove(i.socket)
 }
 
 func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
@@ -78,8 +95,8 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	}
 }
 
-func (i *Intercepter) ListenSocket(path string) {
-	l, err := net.Listen("unix", path)
+func (i *Intercepter) ListenSocket() {
+	l, err := net.Listen("unix", i.socket)
 	if err != nil {
 		log.Fatal("listen error:", err)
 	}
