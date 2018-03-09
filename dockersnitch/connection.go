@@ -8,79 +8,80 @@ import (
 	"os"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
-	"github.com/google/gopacket"
 )
 
-type ConnectionStatus int
+type ConnectionStatus string
 
 const (
-	Whitelisted ConnectionStatus = iota
-	Blacklisted
-	Prompting
-	Unitialized
+	Whitelisted = "whitelisted"
+	Blacklisted = "blacklisted"
+	Prompting   = "prompting"
+	Unitialized = "unitialized"
 )
-
-// NewConnection ...
-// We're still in the main loop here so return as soon as possible
-func NewConnection(p *netfilter.NFPacket) *Connection {
-	c := &Connection{}
-	c.Status = Unitialized
-	c.NFPacket = p
-	c.Queue = make(chan *netfilter.NFPacket, 100)
-	return c
-}
 
 type Connection struct {
 	Queue    chan *netfilter.NFPacket
 	NFPacket *netfilter.NFPacket
+	Dst      string
 	Status   ConnectionStatus
 }
 
-func (c *Connection) Prompt(p *netfilter.NFPacket) ConnectionStatus {
+func (c *Connection) ProcessPacket(p *netfilter.NFPacket) {
+	switch c.Status {
+	case Whitelisted:
+		c.Accept(p)
+	case Blacklisted:
+		c.Drop(p)
+	default:
+		log.Fatalf("Connection status is %s, needs to be Whitelisted or Blacklisted before running ProcessPacket.", string(c.Status))
+	}
+}
+
+func (c *Connection) ProcessQueue() {
+	select {
+	case p := <-c.Queue:
+		switch c.Status {
+		case Whitelisted:
+			c.Accept(p)
+		case Blacklisted:
+			c.Drop(p)
+		default:
+			log.Fatalf("Connection status is %s, needs to be Whitelisted or Blacklisted before running ProcessQueue.", string(c.Status))
+		}
+	default:
+		log.Printf("Done processing queue")
+	}
+}
+
+func (c *Connection) Prompt() ConnectionStatus {
 	c.Status = Prompting
-	dst := p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String()
-	log.Printf("Prompting on dst %s", dst)
+	log.Printf("Prompting on dst %s", c.Dst)
 	r := bufio.NewReader(os.Stdin)
-	fmt.Printf("New connection to %s found, is this expected? [yes/no] ", dst)
+	fmt.Printf("New connection to %s found, is this expected? [yes/no] ", c.Dst)
 	resp, _, err := r.ReadLine()
 	if err != nil {
 		log.Fatal(err)
 	}
 	if string(resp) == "yes" {
-		c.Whitelist(p)
-		return Whitelisted
+		c.Status = Whitelisted
 	} else {
-		c.Blacklist(p)
-		return Blacklisted
+		c.Status = Blacklisted
 	}
+	return c.Status
 }
 
-func (c *Connection) Whitelist(p *netfilter.NFPacket) {
-	log.Printf("Setting whitelist for dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
-	(*p).SetVerdict(netfilter.NF_ACCEPT)
-	select {
-	case p := <-c.Queue:
-		(*p).SetVerdict(netfilter.NF_ACCEPT)
-	default:
-	}
-	c.Status = Whitelisted //Do this last to prevent any out of order packets
-	return
+func (c *Connection) Accept(p *netfilter.NFPacket) {
+	log.Printf("Accepting packet for dst %s", c.Dst)
+	p.SetVerdict(netfilter.NF_ACCEPT)
 }
 
-func (c *Connection) Blacklist(p *netfilter.NFPacket) {
-	log.Printf("Setting blacklist for dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
-	(*p).SetVerdict(netfilter.NF_DROP)
-	select {
-	case p := <-c.Queue:
-		(*p).SetVerdict(netfilter.NF_DROP)
-	default:
-	}
-	c.Status = Blacklisted //Do this last to prevent any out of order packets
-	return
+func (c *Connection) Drop(p *netfilter.NFPacket) {
+	log.Printf("Dropping packet for dst %s", c.Dst)
+	p.SetVerdict(netfilter.NF_DROP)
 }
 
-func (c *Connection) QueueNFPacket(p *netfilter.NFPacket) error {
-	log.Printf("Queueing packet with dst %s", p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String())
+func (c *Connection) QueuePacket(p *netfilter.NFPacket) error {
+	log.Printf("Queueing packet with dst %s", c.Dst)
 	select {
 	case c.Queue <- p:
 		return nil

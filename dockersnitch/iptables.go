@@ -1,6 +1,7 @@
 package dockersnitch
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -17,16 +18,32 @@ func SetupIPTables() {
 		log.Printf("iptables: Chain %s already exists, won't continue with setup", IPTChain)
 		return
 	}
-	if err := ipt.Append("filter", IPTChain, "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"); err != nil {
-		log.Printf("iptables: Could not set up ACCEPT rule on chain $s", IPTChain)
+
+	if err := ipt.Append("filter", IPTChain, "-m", "set", "--match-set", "dockersnitch_whitelist", "dst", "-j", "ACCEPT"); err != nil {
+		log.Printf("iptables: Could not set up Accept rule on chain $s", IPTChain)
 		log.Fatal(err)
 	}
-	if err := ipt.Append("filter", IPTChain, "-m", "state", "--state", "NEW", "-j", "NFQUEUE", "--queue-num", "0"); err != nil {
+	if err := ipt.Append("filter", IPTChain, "-m", "set", "--match-set", "dockersnitch_blacklist", "dst", "-j", "REJECT"); err != nil {
+		log.Printf("iptables: Could not set up Reject rule on chain $s", IPTChain)
+		log.Fatal(err)
+	}
+
+	//if err := ipt.Append("filter", IPTChain, "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"); err != nil {
+	//	log.Printf("iptables: Could not set up ACCEPT rule on chain $s", IPTChain)
+	//	log.Fatal(err)
+	//}
+
+	if err := ipt.Append("filter", IPTChain, "-j", "LOG"); err != nil {
+		log.Printf("iptables: Could not set up Reject rule on chain $s", IPTChain)
+		log.Fatal(err)
+	}
+
+	if err := ipt.Append("filter", IPTChain, "-j", "NFQUEUE", "--queue-num", fmt.Sprint(NFQueueNum)); err != nil {
 		log.Printf("iptables: Could not set up NFQUEUE rule on chain $s", IPTChain)
 		log.Fatal(err)
 	}
 
-	if err := ipt.Insert("filter", "DOCKER-USER", 1, "-p", "icmp", "-j", IPTChain); err != nil {
+	if err := ipt.Insert("filter", "DOCKER-USER", 1, "-p", "tcp", "-s", "172.17.0.2", "-j", IPTChain); err != nil {
 		log.Printf("iptables: Could not set up NFQUEUE rule on chain $s", IPTChain)
 		log.Fatal(err)
 	}
@@ -37,7 +54,7 @@ func TeardownIPTables() {
 	if err != nil {
 		log.Fatalf("iptables: could not initialize iptables")
 	}
-	if err := ipt.Delete("filter", "DOCKER-USER", "-p", "icmp", "-j", IPTChain); err != nil {
+	if err := ipt.Delete("filter", "DOCKER-USER", "-p", "tcp", "-s", "172.17.0.2", "-j", IPTChain); err != nil {
 		log.Printf("iptables: Could not delete rule %s jump rule in DOCKER-USER chain", IPTChain)
 	}
 	if err := ipt.ClearChain("filter", IPTChain); err != nil {
