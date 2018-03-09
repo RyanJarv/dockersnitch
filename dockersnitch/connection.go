@@ -57,17 +57,25 @@ func (c *Connection) Prompt(f io.ReadWriteCloser) ConnectionStatus {
 	c.Status = Prompting
 	fmt.Printf("Prompting on dst %s", c.Dst)
 	r := bufio.NewReader(f)
-	f.Write([]byte(fmt.Sprintf("New connection to %s found, is this expected? [yes/no] ", c.Dst)))
-	resp, _, err := r.ReadLine()
-	if err != nil {
-		log.Fatal(err)
+	for {
+		f.Write([]byte(c.Dst))
+		resp, _, err := r.ReadLine()
+		if err != nil {
+			log.Fatal(err)
+		}
+		switch string(resp) {
+		case "w":
+			c.Status = Whitelisted
+		case "b":
+			c.Status = Blacklisted
+		default:
+			log.Printf("Unexpected response %s", string(resp))
+		}
+		if c.Status != Prompting {
+			break
+		}
 	}
-	if string(resp) == "yes" {
-		c.Status = Whitelisted
-	} else {
-		c.Status = Blacklisted
-	}
-	f.Write([]byte(fmt.Sprintf("Allowing connection to %s\n", c.Dst)))
+	log.Printf("Allowing connection to %s", c.Dst)
 	return c.Status
 }
 
