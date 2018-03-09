@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/janeczku/go-ipset/ipset"
@@ -19,8 +18,6 @@ type IPTables struct {
 }
 
 func (i *IPTables) Setup() {
-	i.cleanupOnCtrlC()
-
 	cmd := exec.Command("ipset", "create", "-exist", "dockersnitch_blacklistset", "list:set")
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -126,16 +123,4 @@ func (i *IPTables) Teardown() {
 		log.Printf("iptables: Could not delete chain %s", i.Chain)
 		log.Fatal(err)
 	}
-}
-
-func (i *IPTables) cleanupOnCtrlC() {
-	go func() {
-		signal_channel := make(chan os.Signal)
-		signal.Notify(signal_channel, os.Interrupt)
-		<-signal_channel
-		log.Printf("Cleaning up Dockersnitch.IPTables")
-		i.Teardown()
-		log.Printf("Done tearing down Dockersnitch.IPTables")
-	}()
-	log.Printf("done with iptables")
 }

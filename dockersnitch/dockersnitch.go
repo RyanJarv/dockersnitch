@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	//"os/signal"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
@@ -43,20 +42,12 @@ func (i *Intercepter) RunMainQueue() {
 	}
 	defer nfq.Close()
 
-	signal_channel := make(chan os.Signal)
-	signal.Notify(signal_channel, os.Interrupt)
 	packets := nfq.GetPackets()
-	for {
-		select {
-		case p := <-packets:
-			go i.handlePacket(&p)
-		case <-signal_channel:
-			log.Printf("Cleaning up Dockersnitch.Intercepter")
-			i.Teardown()
-			log.Printf("Done tearing down Dockersnitch.Intercepter")
-			return
+	go func() {
+		for p := range packets {
+			i.handlePacket(&p)
 		}
-	}
+	}()
 }
 
 func (i *Intercepter) Teardown() {
