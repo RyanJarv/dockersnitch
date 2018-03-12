@@ -101,7 +101,7 @@ func (i *IPTables) Setup() {
 		log.Fatal(err)
 	}
 
-	if err := ipt.Insert("filter", "DOCKER-USER", 1, "-p", "tcp", "-s", "172.17.0.2", "-j", i.Chain); err != nil {
+	if err := ipt.Insert("filter", "DOCKER-USER", 1, "-p", "tcp", "-s", "172.17.0.0/24", "-j", i.Chain); err != nil {
 		log.Printf("iptables: Could not set up NFQUEUE rule on chain $s", i.Chain)
 		log.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func (i *IPTables) Teardown() {
 	if err != nil {
 		log.Fatalf("iptables: could not initialize iptables")
 	}
-	if err := ipt.Delete("filter", "DOCKER-USER", "-p", "tcp", "-s", "172.17.0.2", "-j", i.Chain); err != nil {
+	if err := ipt.Delete("filter", "DOCKER-USER", "-p", "tcp", "-s", "172.17.0.0/24", "-j", i.Chain); err != nil {
 		log.Printf("iptables: Could not delete rule %s jump rule in DOCKER-USER chain", i.Chain)
 	}
 	if err := ipt.ClearChain("filter", i.Chain); err != nil {

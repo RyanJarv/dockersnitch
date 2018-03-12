@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"log"
+	"net"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
 )
@@ -53,15 +53,15 @@ func (c *Connection) ProcessQueue() {
 	}
 }
 
-func (c *Connection) Prompt(f io.ReadWriteCloser) ConnectionStatus {
+func (c *Connection) Prompt(conn net.Conn) ConnectionStatus {
 	c.Status = Prompting
 	fmt.Printf("Prompting on dst %s", c.Dst)
-	r := bufio.NewReader(f)
+	bufR := bufio.NewReader(conn)
 	for {
-		f.Write([]byte(c.Dst))
-		resp, _, err := r.ReadLine()
+		conn.Write(append([]byte(c.Dst), byte('\n')))
+		resp, _, err := bufR.ReadLine()
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Could not read response from connection")
 		}
 		switch string(resp) {
 		case "w":

@@ -1,10 +1,8 @@
 package dockersnitch
 
 import (
-	"fmt"
 	"log"
 	"net"
-	"os"
 	//"os/signal"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
@@ -12,22 +10,22 @@ import (
 	"github.com/janeczku/go-ipset/ipset"
 )
 
-func NewIntercepter(p string, nfqueue uint16, bl *ipset.IPSet, wl *ipset.IPSet) *Intercepter {
+func NewIntercepter(s net.Conn, nfqueue uint16, bl *ipset.IPSet, wl *ipset.IPSet) *Intercepter {
 	i := &Intercepter{
-		socket:    p,
+		Stream:    s,
 		connList:  map[string]*Connection{},
 		nfQueue:   nfqueue,
 		blacklist: bl,
 		whitelist: wl,
 	}
-	i.ListenSocket()
+
 	return i
 }
 
 type Intercepter struct {
-	socket    string
-	stream    net.Conn
+	Stream    net.Conn // read by network or other objects
 	nfQueue   uint16
+	nfq       *netfilter.NFQueue
 	connList  map[string]*Connection
 	blacklist *ipset.IPSet
 	whitelist *ipset.IPSet
@@ -35,14 +33,13 @@ type Intercepter struct {
 
 func (i *Intercepter) RunMainQueue() {
 	log.Printf("Running main queue")
-	nfq, err := netfilter.NewNFQueue(i.nfQueue, 100, netfilter.NF_DEFAULT_PACKET_SIZE)
+	var err error
+	i.nfq, err = netfilter.NewNFQueue(i.nfQueue, 100, netfilter.NF_DEFAULT_PACKET_SIZE)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	defer nfq.Close()
 
-	packets := nfq.GetPackets()
+	packets := i.nfq.GetPackets()
 	go func() {
 		for p := range packets {
 			i.handlePacket(&p)
@@ -51,11 +48,12 @@ func (i *Intercepter) RunMainQueue() {
 }
 
 func (i *Intercepter) Teardown() {
-	os.Remove(i.socket)
+	i.nfq.Close()
 }
 
 func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	dst := p.Packet.(gopacket.Packet).NetworkLayer().NetworkFlow().Dst().String()
+	log.Printf("Handling packet dst %s", dst)
 
 	c, ok := i.connList[dst]
 	if ok == false {
@@ -73,7 +71,7 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	case Unitialized:
 		log.Printf("Prompting for connection with dst: %s", dst)
 		c.QueuePacket(p)
-		if c.Prompt(i.stream) == Whitelisted {
+		if c.Prompt(i.Stream) == Whitelisted {
 			log.Printf("Whitelisting connection with dst %s", dst)
 			i.whitelist.Add(dst, 0)
 		} else {
@@ -84,29 +82,4 @@ func (i *Intercepter) handlePacket(p *netfilter.NFPacket) {
 	default:
 		log.Print("This shouldn't happen: %v", (*p))
 	}
-}
-
-func (i *Intercepter) ListenSocket() {
-	l, err := net.Listen("unix", i.socket)
-	if err != nil {
-		log.Fatal("listen error:", err)
-	}
-
-	go func() {
-		defer l.Close()
-		for {
-			s, err := l.Accept()
-			if err != nil {
-				log.Fatal("accept error:", err)
-			}
-			if i.stream == nil {
-				i.stream = s
-			} else if _, err := i.stream.Read([]byte{}); err != nil {
-				i.stream = s
-			} else {
-				s.Write([]byte("Connection already open"))
-				s.Close()
-			}
-		}
-	}()
 }

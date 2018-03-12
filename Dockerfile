@@ -2,12 +2,21 @@ FROM ubuntu:18.04
 
 MAINTAINER Ryan Gerstenkorn version: 0.1
 
-RUN apt-get update && apt-get install -y libnetfilter-queue-dev libnetfilter-queue1 iptables golang ipset && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-
+WORKDIR /go/src/github.com/RyanJarv/dockersnitch 
 ENV GOPATH /go
-WORKDIR /go/src/github.com/RyanJarv/dockersnitch
+ENV PATH /go/bin/:${PATH}
 
-EXPOSE 52632
+RUN apt-get update 
+RUN apt-get install -y libnetfilter-queue-dev libnetfilter-queue1
+RUN apt-get install -y iptables ipset
+RUN apt-get install -y golang sudo
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-CMD ["/usr/bin/bash", "-l"]
+COPY main.go /go/src/github.com/RyanJarv/dockersnitch 
+COPY dockersnitch /go/src/github.com/RyanJarv/dockersnitch/dockersnitch
+COPY vendor /go/src/github.com/RyanJarv/dockersnitch/vendor
+
+RUN mkdir -p /go/bin/; go build -o /go/bin/dockersnitch
+RUN rm -rf /go/src
+
+CMD ["/go/bin/dockersnitch"]
