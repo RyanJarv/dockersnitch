@@ -1,5 +1,5 @@
-hash: bf2c7aec508e5c90929a702b267e2e1fc174d67abb229cef248bcc62efff8a44
-updated: 2018-03-08T18:18:30.820456742-06:00
+hash: 0aa08be09753a4d02132810e89f4c91e2fabd59d06c304ea9c9c06ac142a99d3
+updated: 2018-03-12T06:08:42.972853833-05:00
 imports:
 - name: github.com/AkihiroSuda/go-netfilter-queue
   version: ca2804491d55fc5bbf8f82e938d726b763590525
@@ -20,7 +20,9 @@ imports:
   subpackages:
   - ipset
 - name: github.com/Sirupsen/logrus
-  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
+  version: c155da19408a8799da419ed3eeb0cb5db0ad5dbc
+- name: github.com/vishvananda/netns
+  version: be1fbeda19366dea804f00efff2dd73a1642fdcc
 - name: golang.org/x/crypto
   version: c7dcf104e3a7a1417abc0230cb0d5240d764159d
   subpackages:

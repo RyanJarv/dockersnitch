@@ -14,3 +14,4 @@ import:
   - semver
 - package: github.com/Sirupsen/logrus
   version: ^1.0.4
+- package: github.com/vishvananda/netns
