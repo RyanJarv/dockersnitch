@@ -17,32 +17,41 @@ import (
 func main() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	origns, err := netns.Get()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Save the current network namespace
-	origns, _ := netns.Get()
-	defer origns.Close()
+	network, address := "tcp", "0.0.0.0:33504"
 
-	// Create a new network namespace
-	rootns, _ := netns.GetFromPid(1)
-	netns.Set(rootns)
+	server, client := net.Pipe()
+
+	// Server needs to be started in the original net namespace for port forwarding to work
+	//go dclient.Client(network, address)
+	Server(client, network, address)
+
+	// Root net namespace needed to access host iptables, works because we are running with `--pid host` and `--privileged`
+	rootns, err := netns.GetFromPid(1)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer rootns.Close()
 
+	if err = netns.Set(rootns); err != nil {
+		log.Fatal(err)
+	}
 	iptables := dockersnitch.IPTables{
 		Chain:   "DOCKERSNITCH",
 		NFQueue: 4031,
 	}
 	iptables.Setup()
-	network, address := "tcp", "0.0.0.0:33504"
 
-	server, client := net.Pipe()
-	//go dclient.Client(network, address)
-	netns.Set(origns)
-	Server(client, network, address)
-	netns.Set(rootns)
 	i := dockersnitch.NewIntercepter(server, iptables.NFQueue, iptables.Blacklist, iptables.Whitelist)
 
 	wg := runOnCtrlC(func() {
-		netns.Set(rootns)
+		if err := netns.Set(rootns); err != nil {
+			log.Fatal(err)
+		}
 		iptables.Teardown()
 		i.Teardown()
 		netns.Set(origns)
