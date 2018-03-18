@@ -7,35 +7,47 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
+	"os/signal"
 	"time"
 )
 
 type Ask struct {
-	output io.Writer
+	output io.WriteCloser
 	input  io.Reader
 }
 
-func (a *Ask) Write(b []byte) (int, error) {
-	addr := strings.TrimSuffix(string(b), "\n")
-	q := fmt.Sprintf("\nAllow connection from %s? [w/b] ", addr)
-	_, err := a.output.Write([]byte(q))
-	return len(b), err
+type Client struct {
+	server net.Conn
+	Ask    func(string) string
 }
 
-func (a *Ask) Read(b []byte) (int, error) {
-	return a.input.Read(b)
+func (c *Client) onCtrlC() {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt)
+	go func() {
+		<-ch
+		c.Teardown()
+	}()
 }
 
-func Client(network, address string) {
-	var server net.Conn
-	ask := &Ask{output: os.Stdout, input: os.Stdin}
+func (c *Client) Teardown() {
+	c.server.Close()
+
+	log.Printf("Closing")
+	//Hack so we are not reading a line from Stdin
+	//c.ask.Write([]byte("\n"))
+	//c.ask.Read(make([]byte, 0))
+}
+
+func (c *Client) Start(network, address string) {
+	c.onCtrlC()
+	//c.ask = &Ask{output: os.Stdout, input: os.Stdin}
 	for {
 		log.Printf("Attempting to connect to %s %s", network, address)
 		var err error
-		server, err = net.Dial(network, address)
+		c.server, err = net.Dial(network, address)
 		if err == nil {
-			s := bufio.NewReader(server)
+			s := bufio.NewReader(c.server)
 			line, _, err := s.ReadLine()
 			if err == nil && string(line) == "ready" {
 				break
@@ -44,16 +56,20 @@ func Client(network, address string) {
 		time.Sleep(time.Millisecond * 250)
 	}
 
-	go func() {
-		if _, err := io.Copy(server, ask); err != nil {
-			log.Fatal(err)
+	go func() (err error) {
+		serverR := bufio.NewReader(bufio.NewReader(c.server))
+		for {
+			log.Printf("client readline")
+			var line []byte
+			if line, _, err = serverR.ReadLine(); err != nil {
+				log.Fatal(err)
+			}
+			resp := c.Ask(fmt.Sprintf("Allow connection from %s? [w/b] ", line))
+			log.Printf("client writeline")
+			fmt.Fprintln(c.server, resp)
+			log.Printf("client writeline done")
 		}
 	}()
 
-	go func() {
-		if _, err := io.Copy(ask, server); err != nil {
-			log.Fatal(err)
-		}
-	}()
 	log.Printf("Done setting up")
 }
