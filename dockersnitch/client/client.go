@@ -32,16 +32,10 @@ func (c *Client) onCtrlC() {
 
 func (c *Client) Teardown() {
 	c.server.Close()
-
-	log.Printf("Closing")
-	//Hack so we are not reading a line from Stdin
-	//c.ask.Write([]byte("\n"))
-	//c.ask.Read(make([]byte, 0))
 }
 
 func (c *Client) Start(network, address string) {
 	c.onCtrlC()
-	//c.ask = &Ask{output: os.Stdout, input: os.Stdin}
 	for {
 		log.Printf("Attempting to connect to %s %s", network, address)
 		var err error
@@ -56,20 +50,21 @@ func (c *Client) Start(network, address string) {
 		time.Sleep(time.Millisecond * 250)
 	}
 
-	go func() (err error) {
+	go func() {
 		serverR := bufio.NewReader(bufio.NewReader(c.server))
 		for {
-			log.Printf("client readline")
-			var line []byte
-			if line, _, err = serverR.ReadLine(); err != nil {
+			line, _, err := serverR.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
 				log.Fatal(err)
 			}
+			if len(line) == 0 {
+				continue
+			}
 			resp := c.Ask(fmt.Sprintf("Allow connection from %s? [w/b] ", line))
-			log.Printf("client writeline")
 			fmt.Fprintln(c.server, resp)
-			log.Printf("client writeline done")
 		}
 	}()
-
-	log.Printf("Done setting up")
 }
