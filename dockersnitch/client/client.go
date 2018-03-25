@@ -31,6 +31,10 @@ func (c *Client) onCtrlC() {
 }
 
 func (c *Client) Teardown() {
+	if c == nil {
+		log.Printf("dockersnitch Client instance was nil")
+		return
+	}
 	c.server.Close()
 }
 
