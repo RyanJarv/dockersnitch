@@ -3,7 +3,6 @@ package dockersnitch
 import (
 	"log"
 	"net"
-	//"os/signal"
 
 	"github.com/AkihiroSuda/go-netfilter-queue"
 	"github.com/google/gopacket"
