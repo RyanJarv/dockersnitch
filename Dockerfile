@@ -6,11 +6,10 @@ WORKDIR /go/src/github.com/RyanJarv/dockersnitch
 ENV GOPATH /go
 ENV PATH /go/bin/:${PATH}
 
-RUN apt-get update 
-RUN apt-get install -y libnetfilter-queue-dev libnetfilter-queue1
-RUN apt-get install -y iptables ipset
-RUN apt-get install -y golang sudo
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get dist-upgrade -y
+RUN apt-get install -y libnetfilter-queue-dev libnetfilter-queue1 iptables ipset
+RUN apt-get install -y golang sudo netcat iputils-ping
+RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY main.go /go/src/github.com/RyanJarv/dockersnitch 
 COPY dockersnitch /go/src/github.com/RyanJarv/dockersnitch/dockersnitch
